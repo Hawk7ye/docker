@@ -1,19 +1,23 @@
-FROM ubuntu
+# Base Image
+FROM ubuntu:22.04
 
 # ARG
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies
-RUN apt-get update && apt-get upgrade -y
-RUN apt-get install -y \
+COPY ./bin/entrypoint.sh /entrypoint.sh
+
+# Setup
+RUN apt-get update \
+  && apt-get upgrade -y \
+  && apt-get install -y \
+  tzdata \
   software-properties-common \
   apache2 \
-  openssl
+  openssl \
+  vim
 
-# Apache2
-RUN a2enmod headers rewrite
-COPY config/laravel.conf /etc/apache2/sites-available/laravel.conf
-RUN a2dissite 000-default.conf && a2dissite default-ssl.conf && a2ensite laravel.conf
+# ENV
+ENV TZ="Europe/Berlin"
 
 # Add repo for php8.2
 RUN add-apt-repository ppa:ondrej/php && apt-get update
@@ -30,15 +34,23 @@ RUN apt-get install -y \
   php8.2-zip \
   php8.2-gd 
 
+# Apache2
+RUN a2enmod headers rewrite
+COPY config/laravel.conf /etc/apache2/sites-available/laravel.conf
+RUN a2dissite 000-default.conf && a2dissite default-ssl.conf && a2ensite laravel.conf
+
+# Workdir
+WORKDIR /var/www/html
+
 # Get latest Composer
 RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" 
-RUN php -r "if (hash_file('sha384', 'composer-setup.php') === 'e21205b207c3ff031906575712edab6f13eb0b361f2085f1f1237b7126d785e826a450292b6cfd1d64d92e6563bbde02') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;" 
+RUN php -r "if (hash_file('sha384', 'composer-setup.php') === 'dac665fdc30fdd8ec78b38b9800061b4150413ff2e3b6f88543c636f7cd84f6db9189d43a81e5503cda447da73c7e5b6') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;" 
 RUN php composer-setup.php
 RUN php -r "unlink('composer-setup.php');"
 RUN mv composer.phar /usr/local/bin/composer
 
-WORKDIR /var/www/html
-
+# Ports
 EXPOSE 80
 
-ENTRYPOINT ["/usr/sbin/apache2ctl", "-D", "FOREGROUND"]
+# Entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
